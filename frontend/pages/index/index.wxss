@@ -1,0 +1,52 @@
+/**index.wxss**/
+/* 让整个页面居中排列 */
+.container {
+  padding: 30px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 顶部大标题 */
+.header {
+  font-size: 26px;
+  font-weight: bold;
+  margin-bottom: 50px;
+  color: #333;
+}
+
+/* 超大号的拍照按钮 */
+.camera-btn {
+  background-color: #07c160; /* 微信绿 */
+  color: white;
+  width: 80% !important;
+  padding: 15px 0;
+  border-radius: 20px;
+  font-size: 30px;/*白字大小*/
+  font-weight: bold;
+}
+
+/* 结果显示框 */
+.result-box {
+  margin-top: 50px;
+  padding: 20px;
+  background-color: #f8f8f8;
+  border-radius: 12px;
+  width: 90%;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* 加一点阴影 */
+}
+
+.result-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #e64340; /* 醒目的红色提醒 */
+  margin-bottom: 15px;
+  display: block;
+}
+
+.result-content {
+  font-size: 18px;
+  line-height: 1.6;
+  color: #333;
+  display: block;
+}

@@ -24,17 +24,18 @@ app = FastAPI()
 reader = easyocr.Reader(['ch_sim', 'en'])
 
 # 2. 初始化硅基流动大模型客户端
+api_key_from_env=os.getenv("SILICONFLOW_AK")
 siliconflow_client = OpenAI(
-    api_key="sk-btsbfhpzyqejinvvojkafkqitdvzvjkzzaejjaozoxzigoaj",
+    api_key=api_key_from_env,
     base_url="https://api.siliconflow.cn/v1"
 )
 
 @app.post("/recognize-and-simplify")
-async def recognize_and_simplify(file: UploadFile = File(...)):
+async def recognize_and_simplify(zklmbq_file: UploadFile = File(...)):
     try:
         # --- 阶段一：本地离线 OCR 识别 (EasyOCR) ---
         # 读取上传的文件并转为 numpy 格式
-        contents = await file.read()
+        contents = await zklmbq_file.read()
         image = Image.open(io.BytesIO(contents)).convert('RGB')
         img_np = np.array(image)
 
@@ -55,7 +56,7 @@ async def recognize_and_simplify(file: UploadFile = File(...)):
 2. 怎么吃（一次几颗）？
 3. 什么时候吃？
 4. 有什么绝对不能做的事？
-
+5. 语气正常点，正常提取主要信息就行
 原始文字如下：
 {raw_text}"""
 
