@@ -1,0 +1,13 @@
+<view class="container">
+  <view class="header">银发伴行 - 识药助手</view>
+  
+  <view class="camera-btn" bindtap="uploadImage">
+    <image src="../../images/camera.png" class="icon"></image>
+    <text>点我拍照识药</text>
+  </view>
+
+  <view class="result-box" wx:if="{{simplifiedText}}">
+    <view class="result-title">药要这样吃：</view>
+    <text class="result-content">{{simplifiedText}}</text>
+  </view>
+</view>
