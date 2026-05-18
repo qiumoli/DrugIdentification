@@ -24,3 +24,5 @@ med_knowledge/*-*-*-*-* # 动态生成的音频 (若 voice.mp3 为代码生成�
 # 操作系统默认生成的隐藏文件 (防止跨平台协作时的垃圾文件)
 .DS_Store
 Thumbs.db
+static/voice.mp3
+med_knowledge/
