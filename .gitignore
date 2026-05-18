@@ -1,5 +1,26 @@
+
+# 机密信息
 .env
+
+# 虚拟环境
 venv/
-modelscope/
+env/
+
+# Python 缓存
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# 本地数据库与向量库
+*.db
+*.sqlite3
+medication.db
+med_knowledge/chroma.sqlite3
+# 忽略 med_knowledge 下生成的带有 UUID 格式的缓存文件夹
+med_knowledge/*-*-*-*-* # 动态生成的音频 (若 voice.mp3 为代码生成，取消下方注释)
+# voice.mp3
+
+# 操作系统默认生成的隐藏文件 (防止跨平台协作时的垃圾文件)
+.DS_Store
+Thumbs.db
