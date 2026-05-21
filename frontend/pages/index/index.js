@@ -1,6 +1,6 @@
 // index.js
 // 1. 在最上面定义一个全局地址，以后换了热点只改这里！！
-const SERVER_URL = "http://192.168.43.115:8000"; 
+/* const SERVER_URL = "http://192.168.43.211:8000"; 
 
 Page({
   data: {
@@ -96,4 +96,121 @@ Page({
       }
     })
   },
+}) */
+
+const SERVER_URL = "http://192.168.43.211:8000"; 
+
+Page({
+  data: {
+    isLoading: false,
+    myOpenId: ''
+  },
+
+  onLoad: function() {
+    const that = this;
+    wx.login({
+      success: (res) => {
+        wx.request({
+          url: SERVER_URL + '/login?code=' + res.code,
+          success: (serverRes) => {
+            that.setData({ myOpenId: serverRes.data.openid });
+          }
+        })
+      }
+    })
+  },
+
+  // 新增：跳过识别，直接跳第二页（带测试参数）！！！！！有待删除
+  jumpToResult() {
+    // 测试文字可自定义，想显示什么就改什么
+   const testText = "测试用药说明：每天吃2次，每次1片，饭后温水送服，忌辛辣食物";
+   wx.navigateTo({
+     url: `/pages/result/result?text=${encodeURIComponent(testText)}&audio=${encodeURIComponent('')}`,
+      fail: (err) => {
+       console.error("跳过识别跳转失败：", err);
+        wx.showToast({ title: '跳转失败', icon: 'none' });
+     }
+   });
+  },
+
+  uploadImage: function() {
+    const that = this;
+    this.setData({ isLoading: true });
+
+    wx.requestSubscribeMessage({
+      tmplIds: ['qFTYlaBx_nB6CCIFpTwj-USKD7hM-vkuu25jDTyllVQ'],
+      complete() {
+        that.startCamera();
+      }
+    })
+  },
+
+  startCamera: function() {
+    const that = this;
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      sizeType: ['compressed'],
+      success(res) {
+        const tempFilePath = res.tempFiles[0].tempFilePath;
+        wx.showLoading({ title: '正在认药...' });
+
+        wx.uploadFile({
+          url: SERVER_URL + '/recognize-and-simplify', 
+          filePath: tempFilePath,
+          name: 'zklmbq_file',
+          formData: { 'openid': that.data.myOpenId },
+          success(uploadRes) {  
+            try {
+              // 新增：打印后端返回的原始数据，方便排查
+              console.log("后端原始返回：", uploadRes.data);
+              const data = JSON.parse(uploadRes.data);
+              
+              // 新增：校验后端返回的字段
+              if (data.status === "success" && data.simplified_text) {
+                // 优化：用encodeURIComponent处理特殊字符，避免跳转参数出错
+                const text = encodeURIComponent(data.simplified_text || "");
+                const audio = encodeURIComponent((SERVER_URL + (data.audio_path || "")) || "");
+                
+                // 新增：打印跳转参数，确认无误
+                console.log("跳转参数：", text, audio);
+                
+                // 跳转结果页（路径必须和app.json一致）
+                wx.navigateTo({
+                  url: `/pages/result/result?text=${text}&audio=${audio}`,
+                  // 新增：跳转失败的回调，提示错误
+                  fail: (err) => {
+                    console.error("跳转失败：", err);
+                    wx.showModal({
+                      title: "跳转失败",
+                      content: "请检查页面路径是否正确",
+                      showCancel: false
+                    });
+                  }
+                });
+              } else {
+                wx.showModal({ title: '识别失败', content: data.message || "未识别到药品信息", showCancel: false });
+              }
+            } catch (error) {
+              console.error("解析数据失败：", error);
+              wx.showModal({ 
+                title: '识别失败', 
+                content: '后端返回数据异常，请重试', 
+                showCancel: false 
+              });
+            }
+          },
+          complete() {
+            wx.hideLoading();
+            that.setData({ isLoading: false });
+          }
+        })
+      },
+      fail() {
+        that.setData({ isLoading: false });
+        wx.showToast({ title: '已取消拍照', icon: 'none' });
+      }
+    })
+  }
 })

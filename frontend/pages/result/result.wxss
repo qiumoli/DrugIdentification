@@ -1,0 +1,79 @@
+page {
+  background-color: #f5f5f5;
+}
+
+.container {
+  padding: 40rpx 30rpx;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* 顶部栏（返回+标题） */
+.top-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 60rpx;
+}
+
+/* 返回按钮 */
+.back-btn {
+  font-size: 50rpx;
+  font-weight: bold;
+  color: #07c160;
+  margin-right: 90rpx;
+}
+
+/* 标题（和首页一致） */
+.header {
+  font-size: 60rpx;
+  font-weight: bold;
+  font-family: "STKaiti", "KaiTi", serif;
+  color: #222;
+  flex: 1;
+  text-align: center;
+  margin-left: -70rpx; /* 抵消返回按钮的间距，让标题居中 */
+}
+
+/* 用药说明大方框 */
+.result-box {
+  background-color: white;
+  border-radius: 30rpx;
+  padding: 60rpx 40rpx;
+  flex: 1; /* 占满中间空间 */
+  box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.1);
+  margin-bottom: 60rpx;
+}
+
+/* 说明标题（放大） */
+.result-title {
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #e64340;
+  margin-bottom: 40rpx;
+  display: block;
+}
+
+/* 说明内容（超大字体） */
+.result-content {
+  font-size: 40rpx;
+  line-height: 2;
+  color: #333;
+  letter-spacing: 3rpx;
+  display: block;
+}
+
+/* 超大播放按钮 */
+.play-btn {
+  background-color: #07c160;
+  color: white;
+  width: 100%;
+  padding: 40rpx 0;
+  border-radius: 30rpx;
+  font-size: 48rpx;
+  font-weight: bold;
+  text-align: center;
+  box-shadow: 0 8rpx 16rpx rgba(7, 193, 96, 0.3);
+  margin-bottom: 40rpx;
+}

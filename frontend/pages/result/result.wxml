@@ -1,0 +1,20 @@
+<view class="container">
+  <!-- 顶部栏（返回按钮+标题） -->
+  <view class="top-bar">
+    <view class="back-btn" bindtap="goBack">
+      <text>返回</text>
+    </view>
+    <view class="header">银发伴行-识药助手</view>
+  </view>
+
+  <!-- 用药说明大方框 -->
+  <view class="result-box">
+    <view class="result-title">药要这样吃：</view>
+    <text class="result-content">{{simplifiedText}}</text>
+  </view>
+
+  <!-- 超大播放按钮 -->
+  <view class="play-btn" bindtap="playAudio">
+    <text>🔊 播放用药说明</text>
+  </view>
+</view>
