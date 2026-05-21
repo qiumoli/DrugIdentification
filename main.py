@@ -48,6 +48,19 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    # 2. 【新增】扫药历史表（做记账用，永久保存）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS scan_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            medicine_name TEXT,
+            spoken_text TEXT, 
+            audio_path TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     conn.commit()
     conn.close()
 
@@ -196,50 +209,26 @@ JSON 格式如下：
                 {"role": "user", "content": prompt}
             ],
             stream=False,
-            response_format={"type": "json_object"}# 强制要求大模型返回 JSON
+            response_format={"type": "json_object"}
         )
-        # 拿到大模型返回的 JSON 字符串
+        
         llm_result_str = response.choices[0].message.content
         
         try:
-            # 尝试把字符串转换成 Python 的字典
             structured_data = json.loads(llm_result_str)
             print("🎉 大模型完美提取了数据：", structured_data)
             
-            # 分别把大白话和其他参数拿出来
             simplified_text = structured_data.get("spoken_text", "解析失败，请重试")
             medicine_name = structured_data.get("medicine_name", "未知药物")
             times_per_day = structured_data.get("times_per_day", 0)
             dosage_per_time = structured_data.get("dosage_per_time", "遵医嘱")
-
-            # ==========================================
-            # 【新增】将大模型提取的数据存入数据库，赋予系统“记忆”！
-            # ==========================================
-            try:
-                conn = sqlite3.connect('medication.db')
-                cursor = conn.cursor()
-                
-                # 执行 SQL 插入操作 (暂时用 'test_user' 充当用户，后续接入微信登录再替换)
-                cursor.execute('''
-                    INSERT INTO medication_plans (user_id, medicine_name, times_per_day, dosage_per_time)
-                    VALUES (?, ?, ?, ?)
-                ''', (openid, medicine_name, int(times_per_day), str(dosage_per_time)))
-                
-                conn.commit()
-                conn.close()
-                print(f"💾 成功存入数据库：为 test_user 创建了 {medicine_name} 的吃药计划！")
-            except Exception as db_err:
-                print("❌ 数据库存储失败:", db_err)
-            # ==========================================
-
-
         except Exception as e:
             print("⚠️ 大模型没有按规矩返回 JSON,报错了：", e, "\n原始返回:", llm_result_str)
             return {"status": "error", "message": "大模型数据结构化失败，请重新拍照"}
         
 
         # ==========================================
-        # --- 阶段三 (新增)：云端硅基流动 TTS 语音合成 ---
+        # --- 阶段三：云端硅基流动 TTS 语音合成 ---
         # ==========================================
         audio_path = ""
         try:
@@ -250,15 +239,13 @@ JSON 格式如下：
             }
             tts_data = {
                 "model": "FunAudioLLM/CosyVoice2-0.5B",
-                "input": simplified_text, # 把刚才DeepSeek生成的大白话丢给语音模型
-                "voice": "FunAudioLLM/CosyVoice2-0.5B:alex", # alex 是一个比较稳重的声音
+                "input": simplified_text, 
+                "voice": "FunAudioLLM/CosyVoice2-0.5B:alex", 
                 "response_format": "mp3"
             }
             
-            # 向硅基流动发送请求
             tts_response = requests.post(tts_url, json=tts_data, headers=headers)
             
-            # 把返回的音频存到电脑的 static 文件夹里
             if tts_response.status_code == 200:
                 with open("static/voice.mp3", "wb") as f:
                     f.write(tts_response.content)
@@ -268,16 +255,71 @@ JSON 格式如下：
                 
         except Exception as e:
             print("语音模块异常:", e)
+
+
         # ==========================================
+        # 【修改重点】：等所有东西（包括语音）都生成完了，最后统一存数据库！
+        # ==========================================
+        try:
+            conn = sqlite3.connect('medication.db')
+            cursor = conn.cursor()
+            
+            # 动作 A：存入计划表
+            cursor.execute('''
+                INSERT INTO medication_plans (user_id, medicine_name, times_per_day, dosage_per_time)
+                VALUES (?, ?, ?, ?)
+            ''', (openid, medicine_name, int(times_per_day), str(dosage_per_time)))
+            
+            # 动作 B：存入历史表 (这时候 audio_path 已经真实存在了！)
+            cursor.execute('''
+                INSERT INTO scan_history (user_id, medicine_name, spoken_text, audio_path)
+                VALUES (?, ?, ?, ?)
+            ''', (openid, medicine_name, simplified_text, audio_path))
+
+            conn.commit()
+            conn.close()
+            print(f"💾 成功存入双表：计划表(闹钟) + 历史表(记录)!")
+        except Exception as db_err:
+            print("❌ 数据库存储失败:", db_err)
+
 
         # --- 最后：把文字和语音的路径一起发给小程序 ---
         return {
             "status": "success", 
             "simplified_text": simplified_text,
             "raw_ocr_text_for_debug": raw_text,
-            "audio_path": audio_path # <--- 把生成的 MP3 路径告诉手机
+            "audio_path": audio_path 
         }
 
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# ==========================================
+# 【新增】历史记录查询接口
+# ==========================================
+@app.get("/history")
+def get_history(openid: str):
+    try:
+        conn = sqlite3.connect('medication.db')
+        # 把返回结果变成字典格式，方便转成 JSON
+        conn.row_factory = sqlite3.Row 
+        cursor = conn.cursor()
+        
+        # 用 SQL 的降序排列 (DESC)，让最新拍的药显示在最前面
+        cursor.execute('''
+            SELECT medicine_name, spoken_text, audio_path, created_at 
+            FROM scan_history 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC
+        ''', (openid,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        # 把查询结果打包成列表返回
+        history_list = [dict(row) for row in rows]
+        return {"status": "success", "data": history_list}
+        
     except Exception as e:
         return {"status": "error", "message": str(e)}
 @app.get("/")
