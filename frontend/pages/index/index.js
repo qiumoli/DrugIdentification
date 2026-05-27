@@ -98,14 +98,77 @@ Page({
   },
 }) */
 
-const SERVER_URL = "http://192.168.43.211:8000"; 
+const SERVER_URL = "http://192.168.43.115:8000"; 
 
 Page({
   data: {
     isLoading: false,
-    myOpenId: ''
-  },
+    myOpenId: '',
+    manualMedicineName: '' // 【新增】用来保存用户输入的字
 
+    
+  },
+  // 【新增】监听用户打字
+  onInputMedicine: function(e) {
+    this.setData({
+      manualMedicineName: e.detail.value
+    });
+  },
+ // ==========================================
+  // 【完美缝合版】点击“查询”按钮后执行的动作
+  // ==========================================
+  submitManual: function() {
+    const that = this;
+    const text = this.data.manualMedicineName;
+    
+    if (!text) {
+      wx.showToast({ title: '请先输入药名', icon: 'none' });
+      return;
+    }
+
+    wx.showLoading({ title: '正在查阅说明书...' });
+
+    wx.request({
+      url: SERVER_URL + '/manual-search',
+      method: 'POST',
+      data: {
+        openid: that.data.myOpenId || 'test_user',
+        manual_text: text
+      },
+      success(res) {
+        const data = res.data; 
+        
+        if (data.status === "success") {
+          console.log("✅ 后端手动检索成功！准备携带数据跳转到详情页...");
+         
+          // 【新增】：把服务器 IP 和后端的相对路径拼装成完整的 http:// 网址
+          const fullAudioPath = data.audio_path ? (SERVER_URL + data.audio_path) : '';
+
+          // 核心修复：带着完整的录音网址跳转
+          wx.navigateTo({
+            url: `/pages/result/result?text=${encodeURIComponent(data.simplified_text)}&audio=${encodeURIComponent(fullAudioPath)}`,
+            success: () => {
+              console.log("🚀 成功空降结果详情页！");
+            },
+            fail: (err) => {
+              console.error("❌ 手动输入跳转失败，请检查路由：", err);
+              wx.showToast({ title: '页面跳转失败', icon: 'none' });
+            }
+          });
+
+        } else {
+          wx.showModal({ title: '查询失败', content: data.message, showCancel: false });
+        }
+      },
+      fail(err) {
+        console.error("请求失败", err);
+        wx.showModal({ title: '网络错误', content: '连不上服务器,请检查局域网IP', showCancel: false });
+      },
+      complete() {
+        wx.hideLoading();
+      }
+    });
+  },
   onLoad: function() {
     const that = this;
     wx.login({

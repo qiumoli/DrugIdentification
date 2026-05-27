@@ -12,30 +12,41 @@
   </view>
 </view> -->
 
-
 <view class="container">
-  <!-- 顶部标题区（占1/4页面+拆分换行） -->
   <view class="title-box">
     <text class="title-main">银发伴行</text>
     <text class="title-sub">识药助手</text>
   </view>
 
-   <!-- 新增：跳过识别小按钮 !!有待删除！！！-->
    <view class="skip-btn" bindtap="jumpToResult">
     <text>跳过识别</text>
   </view>
-  
-  <!-- 占位区（把按钮挤到下方） -->
+    
   <view class="placeholder"></view>
 
-  <!-- 拍照按钮（占1/3页面+靠下） -->
   <view class="camera-btn" bindtap="uploadImage" wx:if="{{!isLoading}}">
     <text>点我拍照识药</text>
   </view>
-  <!-- 加载态按钮 -->
   <view class="camera-btn loading-btn" wx:else>
     <text>正在准备相机...</text>
   </view>
+
+  <view class="manual-input-box" style="margin-top: 40px; width: 85%; align-self: center; padding-bottom: 30px;">
+    <text style="color: #666; font-size: 16px; font-weight: bold;">找不到药？试试手动输入：</text>
+    
+    <view style="display: flex; margin-top: 15px; width: 100%;">
+      <input 
+        type="text" 
+        placeholder="输入药名,例如: 降压药" 
+        bindinput="onInputMedicine" 
+        style="flex: 1; border: 2px solid #07c160; padding: 12px; border-radius: 8px; font-size: 18px; background-color: #fff;"
+      />
+      <button bindtap="submitManual" style="margin-left: 10px; background-color: #07c160; color: white; width: 90px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; border-radius: 8px;">
+        查询
+      </button>
+    </view>
+  </view>
+  
 </view>
 
   

@@ -3,6 +3,7 @@ import io
 import ssl # 导入 ssl 模块
 import json
 import requests
+import chromadb
 import sqlite3
 from fastapi.staticfiles import StaticFiles # <--- 【新增】引入静态文件服务
 # ==========================================
@@ -18,10 +19,17 @@ import numpy as np
 from dotenv import load_dotenv
 import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
+from pydantic import BaseModel
+
 
 
 # 加载 .env 文件中的环境变量
 load_dotenv()
+
+# 【新增】定义手动输入的请求格式
+class ManualRequest(BaseModel):
+    openid: str
+    manual_text: str
 
 app = FastAPI()
 
@@ -188,18 +196,43 @@ async def recognize_and_simplify(zklmbq_file: UploadFile = File(...), openid: st
         if not raw_text.strip():
              return {"status": "error", "message": "未在图片中识别到清晰文字，请重新拍照"}
 
-        # --- 阶段二：云端硅基流动 LLM 语义重组 ---
-        prompt = f"""你是一位专业的适老化用药助手。请从下方的药盒 OCR 文字中提取信息。
-你必须严格按照以下的 JSON 格式输出，不要返回任何其他的解释性文字，不要有 markdown 标记。
-JSON 格式如下：
+        # ==========================================
+        # 【新增的硬核技术：RAG 向量检索】
+        # 拿着 OCR 认出来的碎字，去本地数据库里找真理！
+        # ==========================================
+        retrieved_doc = "未检索到官方说明书，请根据药盒文字谨慎判断。" # 默认值
+        try:
+            chroma_client = chromadb.PersistentClient(path="./med_knowledge")
+            collection = chroma_client.get_collection(name="official_manuals")
+            
+            search_results = collection.query(
+                query_texts=[raw_text], # 用图片上的字去搜
+                n_results=1
+            )
+            if search_results['documents'] and search_results['documents'][0]:
+                retrieved_doc = search_results['documents'][0][0]
+                print("\n📚 [RAG 触发] 成功从本地检索到权威说明书，已送给大模型参考！\n")
+        except Exception as e:
+            print("⚠️ RAG 检索跳过或失败:", e)
+
+        
+# --- 阶段二：云端硅基流动 LLM 语义重组 (RAG 增强版) ---
+        # 我们对 Prompt 进行了全面升级，给大模型套上“紧箍咒”
+        prompt = f"""你是一位专业的适老化用药助手。请根据下方提供的【官方药品说明书】和【药盒 OCR 文字】提取信息。
+警告：你必须严格依据官方说明书的内容回答！绝不能自己瞎编（禁止 AI 幻觉）。如果 OCR 文字和说明书有出入，以官方说明书为准！
+
+你必须严格按照以下的 JSON 格式输出：
 {{
-  "spoken_text": "用不超过150字的通俗大白话解释(包含怎么吃、何时吃、有什么禁忌)，语气要亲切自然。",
+  "spoken_text": "用不超过150字的通俗大白话解释(包含怎么吃、何时吃、有什么禁忌)，语气要亲切。",
   "medicine_name": "提取到的药名",
-  "times_per_day": "每天吃几次(只能填纯数字，比如 3。如果不确定填 0)",
-  "dosage_per_time": "每次的剂量(比如:1包,或 2粒)"
+  "times_per_day": "每天吃几次（纯数字）",
+  "dosage_per_time": "每次的剂量"
 }}
 
-原始文字如下：
+【权威参考：官方药品说明书】
+{retrieved_doc}
+
+【用户实际拍到的：药盒 OCR 文字】
 {raw_text}"""
 
         response = siliconflow_client.chat.completions.create(
@@ -293,6 +326,112 @@ JSON 格式如下：
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+# ==========================================
+# 【新增】手动输入查药接口 (无 OCR 版)
+# ==========================================
+@app.post("/manual-search")
+def manual_search(req: ManualRequest):
+    openid = req.openid
+    raw_text = req.manual_text
+    
+    if not raw_text.strip():
+        return {"status": "error", "message": "药名不能为空"}
+        
+    try:
+        # --- 阶段一：RAG 向量检索 ---
+        retrieved_doc = "未检索到官方说明书，请根据常识谨慎判断。" 
+        try:
+            def get_chinese_embedding(text):
+                url = "https://api.siliconflow.cn/v1/embeddings"
+                headers = {"Authorization": f"Bearer {os.getenv('SILICONFLOW_AK')}", "Content-Type": "application/json"}
+                res = requests.post(url, json={"model": "BAAI/bge-m3", "input": [text]}, headers=headers).json()
+                return res["data"][0]["embedding"]
+                
+            chroma_client = chromadb.PersistentClient(path="./med_knowledge")
+            collection = chroma_client.get_collection(name="official_manuals")
+            
+            query_embed = get_chinese_embedding(raw_text)
+            search_results = collection.query(query_embeddings=[query_embed], n_results=1)
+            
+            if search_results['documents'] and search_results['documents'][0]:
+                retrieved_doc = search_results['documents'][0][0]
+                print(f"📚 [手动查询-RAG触发] 检索到说明书：{search_results['metadatas'][0][0]['medicine_name']}")
+        except Exception as e:
+            print("⚠️ RAG 检索异常:", e)
+
+        # --- 阶段二：大模型提炼大白话 ---
+        prompt = f"""你是一位专业的适老化用药助手。请根据下方的【官方药品说明书】和用户输入的【药名】提取信息。
+警告：必须严格依据说明书回答！格式必须是严格的 JSON。
+{{
+  "spoken_text": "用不超过150字的通俗大白话解释，语气亲切。",
+  "medicine_name": "药名",
+  "times_per_day": "每天几次(纯数字)",
+  "dosage_per_time": "每次剂量"
+}}
+【权威说明书】{retrieved_doc}
+【用户输入】{raw_text}"""
+
+        response = siliconflow_client.chat.completions.create(
+            model="deepseek-ai/DeepSeek-V3", 
+            messages=[
+                {"role": "system", "content": "你是一个严格输出 JSON 格式的医疗数据提取器。"},
+                {"role": "user", "content": prompt}
+            ],
+            stream=False,
+            response_format={"type": "json_object"}
+        )
+        
+        structured_data = json.loads(response.choices[0].message.content)
+        simplified_text = structured_data.get("spoken_text", "解析失败")
+        medicine_name = structured_data.get("medicine_name", raw_text)
+        times_per_day = structured_data.get("times_per_day", 0)
+        dosage_per_time = structured_data.get("dosage_per_time", "遵医嘱")
+
+        # --- 阶段三：语音合成 ---
+        audio_path = ""
+        try:
+            tts_url = "https://api.siliconflow.cn/v1/audio/speech"
+            headers = {"Authorization": f"Bearer {os.getenv('SILICONFLOW_AK')}", "Content-Type": "application/json"}
+            tts_data = {
+                "model": "FunAudioLLM/CosyVoice2-0.5B",
+                "input": simplified_text, 
+                "voice": "FunAudioLLM/CosyVoice2-0.5B:alex", 
+                "response_format": "mp3"
+            }
+            tts_response = requests.post(tts_url, json=tts_data, headers=headers)
+            if tts_response.status_code == 200:
+                with open("static/voice.mp3", "wb") as f:
+                    f.write(tts_response.content)
+                audio_path = "/static/voice.mp3"
+        except Exception as e:
+            print("语音生成报错:", e)
+
+        # --- 阶段四：存入双表 ---
+        try:
+            conn = sqlite3.connect('medication.db')
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO medication_plans (user_id, medicine_name, times_per_day, dosage_per_time) VALUES (?, ?, ?, ?)", 
+                           (openid, medicine_name, int(times_per_day), str(dosage_per_time)))
+            cursor.execute("INSERT INTO scan_history (user_id, medicine_name, spoken_text, audio_path) VALUES (?, ?, ?, ?)", 
+                           (openid, medicine_name, simplified_text, audio_path))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print("存库失败:", e)
+
+        return {
+            "status": "success", 
+            "simplified_text": simplified_text,
+            "audio_path": audio_path
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+
+
 
 # ==========================================
 # 【新增】历史记录查询接口
