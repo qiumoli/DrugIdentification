@@ -1,122 +1,20 @@
-// index.js
-// 1. 在最上面定义一个全局地址，以后换了热点只改这里！！
-/* const SERVER_URL = "http://192.168.43.211:8000"; 
-
-Page({
-  data: {
-    simplifiedText: '',
-    myOpenId: '' // 新增一个用来存身份证的变量
-  },
-
-  // 【新增】页面一打开，立刻执行微信 OAuth 登录流程
-  onLoad: function() {
-    const that = this;
-    wx.login({
-      success: (res) => {
-        // 拿着临时 code 去找我们的 Python 服务器换 OpenID
-        wx.request({
-          url: SERVER_URL + '/login?code=' + res.code,
-          success: (serverRes) => {
-            that.setData({ myOpenId: serverRes.data.openid });
-            console.log("🔑 登录成功！我的身份证是:", serverRes.data.openid);
-          }
-        })
-      }
-    })
-  },
- // 第一步：点击按钮触发授权框
-  uploadImage: function() {
-    const that = this; 
-    
-    // 弹出微信官方的订阅消息授权框
-    wx.requestSubscribeMessage({
-      tmplIds: ['qFTYlaBx_nB6CCIFpTwj-USKD7hM-vkuu25jDTyllVQ'], // 填入你的真实模板ID
-      success(res) {
-        if (res['qFTYlaBx_nB6CCIFpTwj-USKD7hM-vkuu25jDTyIlVQ'] === 'accept') {
-          console.log("✅ 用户同意了吃药提醒推送！");
-        } else {
-          console.log("❌ 用户拒绝了推送。");
-        }
-      },
-      complete() {
-        // 不管老人家点“允许”还是“拒绝”，框关掉后，立刻拉起相机
-        that.startCamera();
-      }
-    })
-  },
-
-  // 第二步：实际的拍照和网络请求逻辑（其实就是你之前的代码换了个名字）
-  startCamera: function() {
-    const that = this;
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['album', 'camera'],
-      sizeType: ['compressed'],
-      success(res) {
-        const tempFilePath = res.tempFiles[0].tempFilePath;
-        wx.showLoading({ title: '正在认药...' });
-
-        wx.uploadFile({
-          url: SERVER_URL + '/recognize-and-simplify', 
-          filePath: tempFilePath,
-          name: 'zklmbq_file',
-          // 【新增】把身份证一起打包发给后端
-          formData: {
-            'openid': that.data.myOpenId
-          },
-          success(uploadRes) {  
-            try {
-              const data = JSON.parse(uploadRes.data);
-              if (data.status === "success") {
-                that.setData({
-                  simplifiedText: data.simplified_text
-                });
-                console.log("✅ 页面更新文字成功！");
-
-                if (data.audio_path) {
-                  const innerAudioContext = wx.createInnerAudioContext();
-                  innerAudioContext.src = SERVER_URL + data.audio_path + "?t=" + new Date().getTime(); 
-                  innerAudioContext.play(); 
-                  innerAudioContext.onError((err) => {
-                    console.error("❌ 播放录音失败了:", err.errMsg);
-                  });
-                }
-              } else {
-                wx.showModal({ title: '识别失败', content: data.message, showCancel: false });
-              }
-            } catch (error) {
-              console.error("❌ 解析后端返回的数据失败:", error);
-            }
-          },
-          complete() {
-            wx.hideLoading();
-          }
-        })
-      }
-    })
-  },
-}) */
-
-const SERVER_URL = "http://192.168.43.115:8000"; 
+const SERVER_URL = "http://192.168.43.211:8000"; 
 
 Page({
   data: {
     isLoading: false,
     myOpenId: '',
-    manualMedicineName: '' // 【新增】用来保存用户输入的字
-
-    
+    manualMedicineName: ''
   },
-  // 【新增】监听用户打字
+
+  // 监听用户输入药名
   onInputMedicine: function(e) {
     this.setData({
       manualMedicineName: e.detail.value
     });
   },
- // ==========================================
-  // 【完美缝合版】点击“查询”按钮后执行的动作
-  // ==========================================
+
+  // 手动查询药名
   submitManual: function() {
     const that = this;
     const text = this.data.manualMedicineName;
@@ -139,36 +37,33 @@ Page({
         const data = res.data; 
         
         if (data.status === "success") {
-          console.log("✅ 后端手动检索成功！准备携带数据跳转到详情页...");
-         
-          // 【新增】：把服务器 IP 和后端的相对路径拼装成完整的 http:// 网址
+          console.log("✅ 后端手动检索成功！");
           const fullAudioPath = data.audio_path ? (SERVER_URL + data.audio_path) : '';
 
-          // 核心修复：带着完整的录音网址跳转
+          // ✅【保存历史记录】
+          that.saveToHistory(data.simplified_text);
+
           wx.navigateTo({
             url: `/pages/result/result?text=${encodeURIComponent(data.simplified_text)}&audio=${encodeURIComponent(fullAudioPath)}`,
-            success: () => {
-              console.log("🚀 成功空降结果详情页！");
-            },
             fail: (err) => {
-              console.error("❌ 手动输入跳转失败，请检查路由：", err);
+              console.error("❌ 跳转失败", err);
               wx.showToast({ title: '页面跳转失败', icon: 'none' });
             }
           });
-
         } else {
           wx.showModal({ title: '查询失败', content: data.message, showCancel: false });
         }
       },
       fail(err) {
         console.error("请求失败", err);
-        wx.showModal({ title: '网络错误', content: '连不上服务器,请检查局域网IP', showCancel: false });
+        wx.showModal({ title: '网络错误', content: '连不上服务器', showCancel: false });
       },
       complete() {
         wx.hideLoading();
       }
     });
   },
+
   onLoad: function() {
     const that = this;
     wx.login({
@@ -183,19 +78,8 @@ Page({
     })
   },
 
-  // 新增：跳过识别，直接跳第二页（带测试参数）！！！！！有待删除
-  jumpToResult() {
-    // 测试文字可自定义，想显示什么就改什么
-   const testText = "测试用药说明：每天吃2次，每次1片，饭后温水送服，忌辛辣食物";
-   wx.navigateTo({
-     url: `/pages/result/result?text=${encodeURIComponent(testText)}&audio=${encodeURIComponent('')}`,
-      fail: (err) => {
-       console.error("跳过识别跳转失败：", err);
-        wx.showToast({ title: '跳转失败', icon: 'none' });
-     }
-   });
-  },
 
+  // 拍照上传
   uploadImage: function() {
     const that = this;
     this.setData({ isLoading: true });
@@ -208,12 +92,9 @@ Page({
     })
   },
 
-// ==========================================
-  // 【新增】录制视频并上传
-  // ==========================================
+  // 视频识别
   uploadVideo: function() {
     const that = this;
-    // 调用微信的媒体接口，限制只能选视频，最长 10 秒
     wx.chooseMedia({
       count: 1,
       mediaType: ['video'],
@@ -226,9 +107,9 @@ Page({
         wx.showLoading({ title: '正在视频分析...', mask: true });
 
         wx.uploadFile({
-          url: SERVER_URL + '/recognize-video', // 指向我们后端刚刚写好的新接口
+          url: SERVER_URL + '/recognize-video',
           filePath: tempFilePath,
-          name: 'video_file', // 后端接收的名字
+          name: 'video_file',
           timeout: 120000, 
           formData: {
             'openid': that.data.myOpenId || 'test_user'
@@ -237,7 +118,10 @@ Page({
             const data = JSON.parse(uploadRes.data);
             if (data.status === "success") {
               const fullAudioPath = data.audio_path ? (SERVER_URL + data.audio_path) : '';
-              // 成功后，同样跳往结果页！
+
+              // ✅【保存历史记录】
+              that.saveToHistory(data.simplified_text);
+
               wx.navigateTo({
                 url: `/pages/result/result?text=${encodeURIComponent(data.simplified_text)}&audio=${encodeURIComponent(fullAudioPath)}`
               });
@@ -258,8 +142,7 @@ Page({
     });
   },
 
-
-
+  // 启动相机识别
   startCamera: function() {
     const that = this;
     wx.chooseMedia({
@@ -278,23 +161,20 @@ Page({
           formData: { 'openid': that.data.myOpenId },
           success(uploadRes) {  
             try {
-              // 新增：打印后端返回的原始数据，方便排查
               console.log("后端原始返回：", uploadRes.data);
               const data = JSON.parse(uploadRes.data);
               
-              // 新增：校验后端返回的字段
               if (data.status === "success" && data.simplified_text) {
-                // 优化：用encodeURIComponent处理特殊字符，避免跳转参数出错
                 const text = encodeURIComponent(data.simplified_text || "");
                 const audio = encodeURIComponent((SERVER_URL + (data.audio_path || "")) || "");
                 
-                // 新增：打印跳转参数，确认无误
                 console.log("跳转参数：", text, audio);
-                
-                // 跳转结果页（路径必须和app.json一致）
+
+                // ✅【保存历史记录】
+                that.saveToHistory(data.simplified_text);
+
                 wx.navigateTo({
                   url: `/pages/result/result?text=${text}&audio=${audio}`,
-                  // 新增：跳转失败的回调，提示错误
                   fail: (err) => {
                     console.error("跳转失败：", err);
                     wx.showModal({
@@ -327,5 +207,32 @@ Page({
         wx.showToast({ title: '已取消拍照', icon: 'none' });
       }
     })
+  },
+
+  // ================================
+  // ✅ 历史记录功能（只新增，不修改原有代码）
+  // ================================
+  jumpToHistory() {
+    wx.navigateTo({
+      url: '/pages/history/history',
+      fail: (err) => {
+        console.error("跳转到历史记录失败：", err);
+        wx.showToast({ title: '跳转失败', icon: 'none' });
+      }
+    });
+  },
+
+  saveToHistory(text) {
+    let history = wx.getStorageSync('drugHistory') || [];
+    const newRecord = {
+      id: Date.now(),
+      text: text,
+      time: new Date().toLocaleString()
+    };
+    history.unshift(newRecord);
+    if (history.length > 20) {
+      history = history.slice(0, 20);
+    }
+    wx.setStorageSync('drugHistory', history);
   }
-})
+});

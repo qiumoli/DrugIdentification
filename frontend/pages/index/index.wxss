@@ -1,79 +1,32 @@
-/* *index.wxss*
-/* 让整个页面居中排列 */
- /*.container {
-  padding: 30px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-/* 顶部大标题 */
-/*.header {
-  font-size: 26px;
-  font-weight: bold;
-  margin-bottom: 50px;
-  color: #333;
-}
-
-/* 超大号的拍照按钮 */
-/*.camera-btn {
-  background-color: #07c160; /* 微信绿 */
-  /*color: white;
-  width: 80% !important;
-  padding: 15px 0;
-  border-radius: 20px;
-  font-size: 30px;/*白字大小*/
-  /*font-weight: bold;
-}
-
-/* 结果显示框 */
-/*.result-box {
-  margin-top: 50px;
-  padding: 20px;
-  background-color: #f8f8f8;
-  border-radius: 12px;
-  width: 90%;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* 加一点阴影 */
-/*}
-
-.result-title {
-  font-size: 20px;
-  font-weight: bold;
-  color: #e64340; /* 醒目的红色提醒 */
-  /*margin-bottom: 15px;
-  display: block;
-}
-
-.result-content {
-  font-size: 18px;
-  line-height: 1.6;
-  color: #333;
-  display: block;
-}  */
-
 page {
   background-color: #f5f5f5;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
 }
 
 /* 容器 */
 .container {
-  padding: 40rpx 30rpx;
+  padding: 0rpx 30rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
   min-height: 100vh;
   box-sizing: border-box;
+  justify-content: flex-start;
 }
 
 /* 顶部标题（放大+改字体） */
 .title-box {
   width: 100%;
-  height: calc(100vh / 4); /* 占页面1/4高度 */
+  height: auto;  
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
+  padding-top: 20rpx;    /* 只留一点点顶部距离 */
+  margin: 0; 
 }
 
 /* 主标题（银发伴行-放大） */
@@ -83,53 +36,64 @@ page {
   font-family: "STKaiti", "KaiTi", serif;
   color: #222;
   display: block; /* 强制换行 */
-  margin-bottom: 20rpx;
+  margin-bottom: 5rpx;
 }
 
 /* 副标题（识药助手-略小） */
 .title-sub {
-  font-size: 70rpx; /* 比主标题小 */
+  font-size: 80rpx; /* 比主标题小 */
   font-weight: bold;
   font-family: "STKaiti", "KaiTi", serif;
   color: #222;
   display: block; /* 强制换行 */
 }
 
-/* 新增：跳过识别小按钮样式 ！！！有待删除！！！！*/
-.skip-btn {
-  font-size: 28rpx; /* 小号字体，不抢焦点 */
-  color: #666; /* 浅灰色，低调 */
-  padding: 10rpx 20rpx; /* 小巧的点击区域 */
-  margin-bottom: 20rpx; /* 和下方占位区留少量间距 */
-  border: 1rpx solid #ddd; /* 浅边框，区分点击区域 */
-  border-radius: 20rpx; /* 圆角，更柔和 */
+/* 历史记录按钮 - 放在标题和大按钮中间，居中 */
+.history-btn {
+  font-size: 50rpx;
+  color: #07c160;
+  padding: 10rpx 20rpx;
+  border: 1rpx solid #07c160;
+  border-radius: 20rpx;
+  margin: 20rpx 0 30rpx 0; /* 上下间距，居中 */
 }
-/* 点击按钮时的态（可选） */
-.skip-btn:active {
-  background-color: #f0f0f0;
-}
-
-
-/* 占位区（把按钮挤到下方） */
-.placeholder {
-  flex: 1; /* 占满上方空间 */
+.history-btn:active {
+  background-color: #f0f9f0;
 }
 
-/* 拍照按钮（占1/3页面+靠下） */
+/* 拍照按钮（紧贴视频按钮，无空隙） */
 .camera-btn {
   background-color: #07c160;
   color: white;
   width: 90%;
-  height: calc(100vh / 3); /* 占页面1/3高度 */
+  height: calc(100vh / 4);
   border-radius: 30rpx;
-  font-size: 48rpx; /* 超大按钮文字 */
+  font-size: 48rpx;
   font-weight: bold;
   text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 8rpx 16rpx rgba(7, 193, 96, 0.3);
-  margin-bottom: 60rpx; /* 靠下留边距 */
+  margin: 0; /* 无下边距 → 紧贴下面按钮 */
+}
+
+/* 视频按钮（直接贴在拍照按钮下面） */
+.video-btn {
+  background-color: #56c9fe;
+  color: white;
+  width: 90%;
+  height: calc(100vh / 4.5);
+  border-radius: 30rpx;
+  font-size: 48rpx;
+  font-weight: bold;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 16rpx rgba(86, 201, 254, 0.3);
+  margin: 0; /* 无间距 */
+  margin-top: 20rpx; /* 如果你想要一点点缝隙，用这个；不要就写 0 */
 }
 
 /* 加载态按钮 */
@@ -137,3 +101,9 @@ page {
   background-color: #999;
   pointer-events: none;
 }
+
+/* 占位区删除，不需要了 */
+.placeholder {
+  display: none;
+}
+

@@ -1,0 +1,31 @@
+<view class="container">
+  <!-- 顶部栏（返回按钮+标题） -->
+  <view class="top-bar">
+    <view class="back-btn" bindtap="goBack">
+      <text>返回</text>
+    </view>
+    <view class="header">历史记录</view>
+  </view>
+
+  <!-- 历史记录列表（卡片式展示） -->
+  <view class="history-list">
+    <!-- 无记录提示 -->
+    <view class="empty-tip" wx:if="{{historyList.length === 0}}">
+      <text>暂无识药历史记录</text>
+    </view>
+    <!-- 历史记录卡片 -->
+    <view class="history-item" wx:for="{{historyList}}" wx:key="id">
+      <view class="item-content">
+        <text>{{item.text}}</text>
+      </view>
+      <view class="item-time">
+        <text>{{item.time}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 清空历史按钮 -->
+  <view class="clear-btn" bindtap="clearHistory" wx:if="{{historyList.length > 0}}">
+    <text>清空历史记录</text>
+  </view>
+</view>

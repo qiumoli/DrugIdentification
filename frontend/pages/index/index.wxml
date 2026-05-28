@@ -1,27 +1,15 @@
-<!-- <view class="container">
-  <view class="header">银发伴行 - 识药助手</view>
-  
-  <view class="camera-btn" bindtap="uploadImage">
-    <image src="../../images/camera.png" class="icon"></image>
-    <text>点我拍照识药</text>
-  </view>
-
-  <view class="result-box" wx:if="{{simplifiedText}}">
-    <view class="result-title">药要这样吃：</view>
-    <text class="result-content">{{simplifiedText}}</text>
-  </view>
-</view> -->
 
 <view class="container">
   <view class="title-box">
     <text class="title-main">银发伴行</text>
     <text class="title-sub">识药助手</text>
   </view>
-
-   <view class="skip-btn" bindtap="jumpToResult">
-    <text>跳过识别</text>
-  </view>
     
+    <!-- 新增：历史记录按钮 -->
+  <view class="history-btn" bindtap="jumpToHistory">
+    <text>历史记录</text>
+  </view>
+
   <view class="placeholder"></view>
 
   <view class="camera-btn" bindtap="uploadImage" wx:if="{{!isLoading}}">
