@@ -208,6 +208,58 @@ Page({
     })
   },
 
+// ==========================================
+  // 【新增】录制视频并上传
+  // ==========================================
+  uploadVideo: function() {
+    const that = this;
+    // 调用微信的媒体接口，限制只能选视频，最长 10 秒
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['video'],
+      sourceType: ['album', 'camera'],
+      maxDuration: 10,
+      camera: 'back',
+      success(res) {
+        const tempFilePath = res.tempFiles[0].tempFilePath;
+        that.setData({ isLoading: true });
+        wx.showLoading({ title: '正在视频分析...', mask: true });
+
+        wx.uploadFile({
+          url: SERVER_URL + '/recognize-video', // 指向我们后端刚刚写好的新接口
+          filePath: tempFilePath,
+          name: 'video_file', // 后端接收的名字
+          timeout: 120000, 
+          formData: {
+            'openid': that.data.myOpenId || 'test_user'
+          },
+          success(uploadRes) {
+            const data = JSON.parse(uploadRes.data);
+            if (data.status === "success") {
+              const fullAudioPath = data.audio_path ? (SERVER_URL + data.audio_path) : '';
+              // 成功后，同样跳往结果页！
+              wx.navigateTo({
+                url: `/pages/result/result?text=${encodeURIComponent(data.simplified_text)}&audio=${encodeURIComponent(fullAudioPath)}`
+              });
+            } else {
+              wx.showModal({ title: '识别失败', content: data.message, showCancel: false });
+            }
+          },
+          fail(err) {
+            console.error("视频上传失败", err);
+            wx.showModal({ title: '网络错误', content: '视频太大或网络不稳定', showCancel: false });
+          },
+          complete() {
+            that.setData({ isLoading: false });
+            wx.hideLoading();
+          }
+        });
+      }
+    });
+  },
+
+
+
   startCamera: function() {
     const that = this;
     wx.chooseMedia({

@@ -1,5 +1,7 @@
 import os
 import io
+import cv2
+import tempfile
 import ssl # 导入 ssl 模块
 import json
 import requests
@@ -461,6 +463,165 @@ def get_history(openid: str):
         
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+# ==========================================
+# 【新增硬核功能】视频抽帧与大语言模型去重接口
+# ==========================================
+@app.post("/recognize-video")
+async def recognize_video(video_file: UploadFile = File(...), openid: str = Form("test_user")):
+    try:
+        # 1. 把前端传过来的视频，暂时保存到电脑硬盘上
+        suffix = os.path.splitext(video_file.filename)[1] or ".mp4"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            contents = await video_file.read()
+            tmp.write(contents)
+            tmp_video_path = tmp.name
+
+        print(f"🎬 接收到视频文件，保存在临时路径: {tmp_video_path}")
+
+        # 2. OpenCV 登场：读取视频并进行“抽帧采样”
+        cap = cv2.VideoCapture(tmp_video_path)
+        fps = cap.get(cv2.CAP_PROP_FPS) # 获取视频帧率 (一秒钟有多少张图)
+        if fps == 0 or fps != fps:
+            fps = 30 # 如果读不到，默认按 30 帧算
+
+        frame_interval = int(fps) # 我们设定每隔 1 秒（即跳过 fps 张图）抽 1 帧
+        
+        all_ocr_texts = []
+        frame_count = 0
+        extracted_count = 0
+
+        print("🎞️ 开始执行抽帧 OCR 识别 (最多提取 8 帧以防超时)...")
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break # 视频读完了
+            
+            # 每隔一秒钟，我们就把这一帧画面交给 EasyOCR
+            if frame_count % frame_interval == 0:
+                # OpenCV 默认是 BGR 颜色，EasyOCR 需要 RGB，做个转换
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                
+                # 开始识别这一帧
+                results = reader.readtext(rgb_frame)
+                texts = [res[1] for res in results]
+                if texts:
+                    all_ocr_texts.extend(texts)
+                    print(f"   -> 第 {extracted_count+1} 秒画面提取到: {' '.join(texts)[:20]}...")
+                
+                extracted_count += 1
+                # 微信请求最多等 15 秒，我们为了防止超时，最多只抽 8 张图
+                if extracted_count >= 3:
+                    break
+                    
+            frame_count += 1
+
+        cap.release()
+        os.remove(tmp_video_path) # 阅后即焚，删掉临时视频
+
+        raw_text = " ".join(all_ocr_texts)
+        if not raw_text.strip():
+            return {"status": "error", "message": "视频太模糊了，一个字都没认出来，请重新录制"}
+
+        # 3. RAG 向量检索 (和之前一样)
+        retrieved_doc = "未检索到官方说明书，请根据常识谨慎判断。" 
+        try:
+            def get_chinese_embedding(text):
+                url = "https://api.siliconflow.cn/v1/embeddings"
+                headers = {"Authorization": f"Bearer {os.getenv('SILICONFLOW_AK')}", "Content-Type": "application/json"}
+                res = requests.post(url, json={"model": "BAAI/bge-m3", "input": [text]}, headers=headers).json()
+                return res["data"][0]["embedding"]
+                
+            chroma_client = chromadb.PersistentClient(path="./med_knowledge")
+            collection = chroma_client.get_collection(name="official_manuals")
+            
+            # 用抽出来的一大堆字去搜
+            query_embed = get_chinese_embedding(raw_text[:500]) # 限制长度防报错
+            search_results = collection.query(query_embeddings=[query_embed], n_results=1)
+            
+            if search_results['documents'] and search_results['documents'][0]:
+                retrieved_doc = search_results['documents'][0][0]
+        except Exception as e:
+            print("⚠️ RAG 检索异常:", e)
+
+
+        # 4. 召唤大模型进行“算法级去重”！(Prompt 升级)
+        prompt = f"""你是一位专业的适老化用药助手。
+下面是我从一段用户拍摄药盒的【10秒视频】中，逐秒提取出来的文字碎片。
+警告：因为是连续视频抽帧，里面存在**极其严重的语句重复、断句和错别字**。
+你的任务是：像人类一样理解这些碎片，去除重复内容，并结合下方的【官方药品说明书】，提炼出准确信息！
+
+必须严格输出 JSON：
+{{
+  "spoken_text": "用不超过150字的通俗大白话解释，语气亲切。",
+  "medicine_name": "药名",
+  "times_per_day": "每天几次(纯数字)",
+  "dosage_per_time": "每次剂量"
+}}
+
+【权威说明书】{retrieved_doc}
+【视频 OCR 碎片大全】{raw_text}"""
+
+        response = siliconflow_client.chat.completions.create(
+            model="deepseek-ai/DeepSeek-V3", 
+            messages=[
+                {"role": "system", "content": "你是一个严格输出 JSON 格式的医疗数据去重与提取器。"},
+                {"role": "user", "content": prompt}
+            ],
+            stream=False,
+            response_format={"type": "json_object"}
+        )
+        
+        structured_data = json.loads(response.choices[0].message.content)
+        simplified_text = structured_data.get("spoken_text", "解析失败")
+        medicine_name = structured_data.get("medicine_name", "未知药物")
+        times_per_day = structured_data.get("times_per_day", 0)
+        dosage_per_time = structured_data.get("dosage_per_time", "遵医嘱")
+        print("🎉 视频分析完毕，大模型去重成功！")
+
+        # 5. 语音合成与数据库存储 (完全复用你的逻辑)
+        audio_path = ""
+        try:
+            tts_url = "https://api.siliconflow.cn/v1/audio/speech"
+            headers = {"Authorization": f"Bearer {os.getenv('SILICONFLOW_AK')}", "Content-Type": "application/json"}
+            tts_data = {
+                "model": "FunAudioLLM/CosyVoice2-0.5B",
+                "input": simplified_text, 
+                "voice": "FunAudioLLM/CosyVoice2-0.5B:alex", 
+                "response_format": "mp3"
+            }
+            tts_response = requests.post(tts_url, json=tts_data, headers=headers)
+            if tts_response.status_code == 200:
+                with open("static/voice.mp3", "wb") as f:
+                    f.write(tts_response.content)
+                audio_path = "/static/voice.mp3"
+        except Exception as e:
+            print("语音生成报错:", e)
+
+        try:
+            conn = sqlite3.connect('medication.db')
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO medication_plans (user_id, medicine_name, times_per_day, dosage_per_time) VALUES (?, ?, ?, ?)", 
+                           (openid, medicine_name, int(times_per_day), str(dosage_per_time)))
+            cursor.execute("INSERT INTO scan_history (user_id, medicine_name, spoken_text, audio_path) VALUES (?, ?, ?, ?)", 
+                           (openid, medicine_name, simplified_text, audio_path))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print("存库失败:", e)
+
+        return {
+            "status": "success", 
+            "simplified_text": simplified_text,
+            "audio_path": audio_path
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+
 @app.get("/")
 def home():
     return {"message": "银发伴行:EasyOCR + DeepSeek 后端已启动！"}

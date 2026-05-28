@@ -27,6 +27,10 @@
   <view class="camera-btn" bindtap="uploadImage" wx:if="{{!isLoading}}">
     <text>点我拍照识药</text>
   </view>
+  <view class="camera-btn" bindtap="uploadVideo" wx:if="{{!isLoading}}" style="background-color: #ff9800; margin-top: 15px;">
+    <text>录个视频识药(10秒内)</text>
+  </view>
+
   <view class="camera-btn loading-btn" wx:else>
     <text>正在准备相机...</text>
   </view>
