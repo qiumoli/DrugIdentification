@@ -625,3 +625,23 @@ async def recognize_video(video_file: UploadFile = File(...), openid: str = Form
 @app.get("/")
 def home():
     return {"message": "银发伴行:EasyOCR + DeepSeek 后端已启动！"}
+
+
+
+# ========== 【新增】停止语音播放接口 ==========
+@app.post("/stop-audio")
+def stop_audio():
+    try:
+        # 终止所有音频播放
+        import subprocess
+        import os
+        import signal
+
+        # 停止所有可能的音频进程
+        subprocess.run(["pkill", "-f", "aplay"], capture_output=True)
+        subprocess.run(["pkill", "-f", "ffplay"], capture_output=True)
+        subprocess.run(["pkill", "-f", "mpg123"], capture_output=True)
+
+        return {"status": "success", "message": "已停止语音播放"}
+    except Exception as e:
+        return {"status": "failed", "message": str(e)}
