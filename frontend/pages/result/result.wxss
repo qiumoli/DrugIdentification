@@ -8,6 +8,7 @@ page {
   flex-direction: column;
   min-height: 100vh;
   box-sizing: border-box;
+  align-items: center; /* 新增：让按钮区域居中 */
 }
 
 /* 顶部栏（返回+标题） */
@@ -44,6 +45,8 @@ page {
   flex: 1; /* 占满中间空间 */
   box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.1);
   margin-bottom: 60rpx;
+  width: 100%; /* 新增：方框占满宽度 */
+  box-sizing: border-box;
 }
 
 /* 说明标题（放大） */
@@ -67,6 +70,20 @@ page {
 /* 超大播放按钮 */
 .play-btn {
   background-color: #07c160;
+  color: white;
+  width: 100%;
+  padding: 40rpx 0;
+  border-radius: 30rpx;
+  font-size: 48rpx;
+  font-weight: bold;
+  text-align: center;
+  box-shadow: 0 8rpx 16rpx rgba(7, 193, 96, 0.3);
+  margin-bottom: 40rpx;
+}
+
+/* 新增：停止语音按钮 */
+.stop-btn {
+  background-color: hsl(0, 100%, 49%);
   color: white;
   width: 100%;
   padding: 40rpx 0;

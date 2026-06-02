@@ -2,7 +2,8 @@ Page({
   data: {
     simplifiedText: '',
     audioUrl: '',
-    audioContext: null
+    audioContext: null,
+    isPlaying: false 
   },
 
   onLoad: function(options) {
@@ -42,8 +43,28 @@ Page({
       wx.showToast({ title: '语音播放失败', icon: 'none' });
     });
 
-    this.setData({ audioContext: innerAudioContext });
+    // 播放时标记状态
+    this.setData({ 
+      audioContext: innerAudioContext,
+      isPlaying: true
+    });
+
+    // 播放结束后恢复状态
+    innerAudioContext.onEnded(() => {
+      this.setData({ isPlaying: false });
+    });
+
     wx.showToast({ title: '正在播放语音', icon: 'none', duration: 1500 });
+  },
+
+  // ================= 【新增：停止播放语音】 =================
+  stopAudio() {
+    const { audioContext } = this.data;
+    if (audioContext) {
+      audioContext.stop();
+      this.setData({ isPlaying: false });
+      wx.showToast({ title: '已停止播放', icon: 'none' });
+    }
   },
 
   onLoad: function(options) {

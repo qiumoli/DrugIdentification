@@ -15,6 +15,12 @@
 
   <!-- 超大播放按钮 -->
   <view class="play-btn" bindtap="playAudio">
-    <text>🔊 播放用药说明</text>
+    <text>🔊 {{isPlaying ? '重新播放' : '播放'}}用药说明</text>
   </view>
-</view>
+
+    <!-- 停止播放按钮（播放时显示） -->
+    <view wx:if="{{isPlaying}}" class="audio-btn stop-btn" bindtap="stopAudio">
+      <text class="btn-icon">🔇</text>
+      <text class="btn-text">停止播放</text>
+    </view>
+  </view>
